@@ -57,7 +57,7 @@ int main()
 			int msglen = read(fdr, other, sizeof(other) / sizeof(char)); // fdr에서 문자열 읽어 other[]에 저장 (리턴값 : 읽은 문자 수)
 
 			if (msglen > 0) {
-				printf("\nother >> %s\n", other);
+				printf("\nother : %s\n", other);
 			}
 
 			sleep(1);
