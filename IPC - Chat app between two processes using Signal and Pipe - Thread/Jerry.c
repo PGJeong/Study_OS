@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h> // POSIX 운영체제 API. read(), write() 등
+#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/types.h> // pid_t 타입(int형) 선언
-#include <sys/wait.h> // wait()
-#include <stdlib.h> // exit()
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <stdlib.h>
 
 int status; // 자식 프로세스의 종료상태
 int fdw;

@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h> // POSIX 운영체제 API. read(), write() 등
+#include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/types.h> // pid_t 타입(int형) 선언
-#include <sys/wait.h> // wait()
-#include <stdlib.h> // exit()
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <stdlib.h>
 #include <pthread.h>
 
-void* receiver_return_val;
-void* sender_return_val;
+int repeat = 1;
 
 int fdw;
 int fdr;
@@ -18,51 +17,46 @@ pthread_attr_t receiverAttr, senderAttr; // Thread 속성(attribute)을 저장하는 객
 
 void sigint(int sig) { // SIGINT 핸들러
 
-	if (pthread_equal(receiverTID, pthread_self()) != 0) { // Receiver Thread인 경우
-		pthread_exit((void*)21);
-		return;
-	}
-	if (pthread_equal(senderTID, pthread_self()) != 0) { // Sender Thread인 경우
-		pthread_exit((void*)22);
-		return;
-	}
+	repeat = 0;
 	
 	// pthread_equal(pthread_t t1, pthread_t t2) : 두 스레드의 ID가 동일하면 0이 아닌 값을 반환 (리턴타입 : int)
-	// pthread_self() : 자신의 TID 반환
-	// pthread_exit (void *return_value) : 해당 스레드만 종료 (다른 스레드에 영향 X)
-	
-	// exit(0); // 프로세스 종료. 해당 시스템 호출은 프로세스 단위로 처리되므로 모든 스레드가 종료.
 }
 
 void* receiver() {
 	/* Receiver Thread (메시지 수신/출력) */
 
 	printf("Receiver Thread Start\n");
-	signal(SIGINT, sigint); // SIGINT 신호 핸들러 등록
 
 	char other[80];
 
-	while (1) {
+	while (repeat) {
 		int msglen = read(fdr, other, sizeof(other) / sizeof(char)); // fdr에서 문자열 읽어 other[]에 저장 (리턴값 : 읽은 문자 수)
 
 		if (msglen > 0) {
 			printf("\nother : %s\n", other);
 		}
 	}
+
+	printf("\nReceiver Thread End (TID : %ld)", pthread_self());
+	pthread_exit((void*)21);
+	// pthread_exit (void *return_value) : 해당 스레드만 종료 (다른 스레드에 영향 X)
 }
 
 void* sender() {
 	/* Sender Thread (메시지 입력/송신) */
 
 	printf("Sender Thread Start\n");
-	signal(SIGINT, sigint); // SIGINT 신호 핸들러 등록
 
 	char user[80];
 
-	while (1) {
+	while (repeat) {
 		fgets(user, sizeof(user) / sizeof(char), stdin);
 		write(fdw, user, strlen(user) + 1); // fdw에 user[]의 문자열 쓰기
 	}
+
+	printf("\nSender Thread End (TID : %ld)", pthread_self());
+	pthread_exit((void*)22);
+	// pthread_exit (void *return_value) : 해당 스레드만 종료 (다른 스레드에 영향 X)
 }
 
 int main()
@@ -91,16 +85,19 @@ int main()
 	pthread_create(&receiverTID, &receiverAttr, receiver, NULL); // Receiver Thread 생성. 매겨변수가 없으므로 마지막 매개변수 NULL
 	pthread_create(&senderTID, &senderAttr, sender, NULL); // Sender Thread 생성
 
-	pthread_join(receiverTID, &receiver_return_val); // Thread Join. Receiver Thread가 종료할 때까지 대기
-	printf("Receiver Thread End (return value : %d)\n", *(int*)receiver_return_val);
+	int receiver_return_val;
+	int sender_return_val;
 
-	pthread_join(senderTID, &sender_return_val); // Thread Join. Sender Thread가 종료할 때까지 대기 (return_val : 스레드 종료시 반환값 저장할 곳)	
-	printf("Sender Thread End (return value : %d)\n", *(int*)sender_return_val);
+	pthread_join(receiverTID, (void*)&receiver_return_val); // Receiver Thread가 종료할 때까지 대기
+	printf("\nReceiver Thread (TID : %ld) Return Value : %d", receiverTID, receiver_return_val);
+
+	pthread_join(senderTID, (void*)&sender_return_val); // Sender Thread가 종료할 때까지 대기 (return_val : 스레드 종료시 반환값 저장할 곳)
+	printf("\nSender Thread  (TID : %ld) Return Value : %d", senderTID, sender_return_val);
 
 	close(fdw); // FIFO의 한 쪽 끝단(쓰기모드) 닫기
 	close(fdr); // FIFO의 한 쪽 끝단(읽기모드) 닫기
 
-	printf("Main Thread End\n");
+	printf("\nMain Thread End (TID : %lu)", pthread_self());
 
 	return 0;
 }
