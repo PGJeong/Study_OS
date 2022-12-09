@@ -61,7 +61,7 @@ int find_victim() { // page_replacement algorithm (★ LRU 알고리즘)
 int swap_area[100][2]; // ★ 스왑 영역 // (순서대로) PID, PageNo
 int sa_index = 0;
 
-void swap_out(int frameNo) { // ★ Swap Out
+void swap_out(int frameNo) { // ★ Swap Out (frameNo : 희생프레임 번호)
 	/* 스왑 영역으로 이동 */
 	swap_area[sa_index][F_PID] = frames[frameNo][F_PID];
 	swap_area[sa_index][F_PAGE_NO] = frames[frameNo][F_PAGE_NO];
@@ -85,7 +85,26 @@ void swap_in(int pid, int pageNo) { // ★ Swap In
 			diskBlockNo = i;
 	}
 
-	// 미완성
+	if (diskBlockNo == 9999) {
+		printf("Error!\n"); // 페이지를 찾을 수 없음
+		return;
+	}
+
+	if (allocated_frames == MAX_FRAME) { // 물리 메모리에 비어있는 프레임이 없는 경우
+		int victim = find_victim(); // 희생페이지 선택
+		swap_out(victim);
+
+		/* 프레임에 페이지 적재 */
+		frames[victim][F_PID] = pid;
+		frames[victim][F_PAGE_NO] = swap_area[diskBlockNo][F_PAGE_NO];
+		frames[victim][F_TIME] = swap_area[diskBlockNo][F_TIME];
+
+		proc[pid]->page_table[pageNo][P_VALID] = 1; // Presence 비트를 1로 수정
+		proc[pid]->page_table[pageNo][P_FRAME_NO] = victim; // Swap In 되었으므로 디스크블록번호 대신 프레임번호 대입
+	}
+	else { // 비어있는 프레임이 있는 경우
+		// 그런 경우는 이 프로그램에 없으므로 구현하지 않음
+	}
 }
 
 void insert_page(int pid) {
@@ -143,11 +162,7 @@ void access_page(int pid, int page_no) {
 	}
 
 	if (!proc[pid]->page_table[page_no][P_VALID]) {
-		printf(" - Page fault occurs - \n");
-		// For using virtual memory, you need to implement the followings:
-	// swap_in |  target:ram <- hdd; (also victim -> hdd)
-
-		return;
+		swap_in(pid, page_no);
 	}
 
 	// we suppose that the page should be modified, always.
@@ -206,7 +221,7 @@ void show_pages(int pid) {
 }
 
 int main() {
-	sys_start_time = time(NULL);
+	sys_start_time = time(NULL); // 시스템 시작 시간
 
 	// Physical memory initializing
 	for (int i = 0; i < MAX_FRAME; i++)
